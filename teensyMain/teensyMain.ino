@@ -123,7 +123,7 @@ void setup() {
   samplerStepper = myStepper(stepsPerRevolution, 26, 27, 28, 25);
 
   if (!SD.begin(SD_CS_PIN)) {
-    Serial.println("initialization failed!");
+    Serial.println("Initialization failed!");
     return;
   }
   
@@ -165,23 +165,33 @@ loop_launch_started:
 		}
 		updatedata();
 	}
-	
+
+
 loop_high_acceleration:
   //take data while waiting for max height
 	float altitudeBuffer[ALTITUDE_BUFFER_SIZE] = {altitude};
   
 	while(true)
 	{
-		if(max_alt - 20 > altitude)
-		{
-			max_alt = altitude;
+    for(int i =0;i < ALTITUDE_BUFFER_SIZE i=; i++){
+      altitudeBuffer[i]=altitudeBuffer[i+1]
+    }
+    altitudeBuffer[ALTITUDE_BUFFER_SIZE]=altitude
+    float averageFirstHalf=0.0
+    for(int i =0;i < floor(ALTITUDE_BUFFER_SIZE/2.0) i=; i++){
+      averageFirstHalf+= altitudeBuffer[i]
+    }
+    averageFirstHalf = averageFirstHalf/(floor(ALTITUDE_BUFFER_SIZE/2.0)-1)
+    float averageSecondHalf=0.0
+    for(int i =0;i < floor(ALTITUDE_BUFFER_SIZE/2.0) i=; i++){
+      averageSecondHalf+= altitudeBuffer[i]
+    }
+    averageSecondHalf = averageSecondHalf/(floor(ALTITUDE_BUFFER_SIZE/2.0)-1)
+    if(averageFirstHalf > averageSecondHalf){
+      ba loop_begun_descent;
+    }
+    else{
 			updateData();
-		}
-		else
-		{
-		  baroFile << "Max altitude: " << altitude << endl;
-		  //TODO: send max alt via downlink
-			ba loop_begun_descent;
 		}
 	}
  
