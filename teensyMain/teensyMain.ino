@@ -235,10 +235,49 @@ void updateData() {
   //TODO: Get and interpret data
   
   timeNow = millis();
-  char dataString= timeNow + "|" + altitude+ 
-  '|'+ x_accel + "|" + y_accel + "|" + z_accel + '\n';
-  char gps_str= timeNow +'|' + coords + '\n';
-  mag_str= timeNow + '|' +coords+ '\n';
+
+  char s_acc_x[7];
+  char s_acc_y[7];
+  char s_acc_z[7];
+  
+
+  char s_ang_acc_x[7];
+  char s_ang_acc_y[7];
+  char s_ang_acc_z[7];
+
+  char s_mag_x[7];
+  char s_mag_y[7];
+  char s_mag_z[7];
+
+  char s_altitude[9];
+  char s_temperature[7];
+  char s_pressure[9];
+
+  char s_pitch[7];
+  char s_yaw[7];
+  char s_roll[7];
+  
+  dtostrf(x_accel, 6,2,s_acc_x);
+  dtostrf(y_accel, 6,2,s_acc_y);
+  dtostrf(z_accel, 8,2,s_acc_z);
+
+  dtostrf(ang_accel_x, 6,2,s_ang_acc_x);
+  dtostrf(ang_accel_y, 6,2,s_ang_acc_y);
+  dtostrf(ang_accel_z, 6,2,s_ang_acc_z);
+
+  dtostrf(mag_x, 6,2,s_mag_x);
+  dtostrf(mag_y, 6,2,s_mag_y);
+  dtostrf(mag_z, 6,2,s_mag_z);
+  
+  dtostrf(altitude, 8,2,s_altitude);
+  dtostrf(pressure, 8,2,s_pressure);
+  dtostrf(temperature, 6,2,s_temperature);
+  
+  dtostrf(pitch, 8,2,s_pitch);
+  dtostrf(roll, 8,2,s_roll);
+  dtostrf(yaw, 6,2,s_yaw);
+
+
   
   writeData();
   sendAllData();
@@ -267,7 +306,7 @@ Main support function to update all the data
 updatedata will call writeData and sendAllData at the end of it
 and the current time
 */
-std::string dataString
+
 
 
 /*
@@ -282,7 +321,7 @@ void writeData() {
 /*
 Third support function to send all data to computer via downlink
 */
-void sendAllData() {
+void sendAllData(char dataString) {
   DOWNLINK_SERIAL.print(dataString);
 }
 
@@ -291,7 +330,9 @@ Method to spin the sampler and keep track of what filter it's on.
 */
 // Pins are 26,27,28,25
 void spinSampler() {
-  samplerStepper.step(STEPS_PER_FILTER);
-  samplerFilter++;
-  logFile.println("Spun to filter " + String(samplerFilter, DEC) + " at " +  String(altitude, DEC) + " meters above sea level and at approximately " + String(millis(), DEC) + " seconds after startup");
+  if (samplerFilter < NUM_FILTERS){  // So it won't fire if it is activated too many times
+    samplerStepper.step(STEPS_PER_FILTER);
+    samplerFilter++;
+    logFile.println("Spun to filter " + String(samplerFilter, DEC) + " at " +  String(altitude, DEC) + " meters above sea level and at approximately " + String(millis(), DEC) + " seconds after startup");
+  }
 }
