@@ -5,7 +5,8 @@
 #include <Wire.h>
 #include <math.h>
 #include <string.h>
-#include <Adafruit_BMP085.h>
+#include <Adafruit_BMP085_U.h>
+//#include <SD.h>
 #include <SdFat.h>
 
 /*****************************************************************/
@@ -68,13 +69,13 @@ File logFile;
 unsigned long timeNow;
 unsigned long targetTime;
 
-Servo samplerFan;
-Stepper samplerStepper; 
+samplerFan Servo;
+samplerStepper Stepper; 
 
 //Sensor variables
-float lin_accel_x;
-float lin_accel_y;
-float lin_accel_z;
+float x_accel;
+float y_accel;
+float z_accel;
 
 float ang_accel_x;
 float ang_accel_y;
@@ -110,7 +111,7 @@ void setup() {
     ; // wait for serial port to connect. Needed for native USB port only
   }
   
-  DOWLINK_SERIAL.begin(9600);
+  DOWNLINK_SERIAL.begin(9600);
   GPS_SERIAL.begin(9600);
   IMU_SERIAL.begin(57600);
 
@@ -143,14 +144,14 @@ void loop() {
 	//TODO: Record the intial height
 	while(true)
 	{
-		if() //Compare against initial height
+		if(altitude > 50 +altitude_baseline) //Compare against initial height
 		{
 			 logFile.println("Altitude change of 50 meters exceeded at " + String(millis(), DEC));
-			 ba loop_high_acceleration;
+			 goto loop_high_acceleration;
 		}
 		else
 		{
-			updatedata();
+			updateData();
 		}
 	}
 	
@@ -158,12 +159,12 @@ loop_launch_started:
 	// we need accurate acceleration curves, 2 g is the initial guess
 	while(true)
 	{
-		if(pow(pow(x_accel, 2) + pow(y_accel, 2) + pow(z_accel), 0.5) <= 15) //Take the magnitude of acceleration and wait until it is smaller than 15 m/s^2
+		if(pow(pow(x_accel, 2) + pow(y_accel, 2) + pow(z_accel,2), 0.5) <= 15) //Take the magnitude of acceleration and wait until it is smaller than 15 m/s^2
 		{
 			 logFile.println("Acceleration dropped to normal levels at "+ String(millis(), DEC));
-			 ba loop_high_acceleration;
+			 goto loop_high_acceleration;
 		}
-		updatedata();
+		updateData();
 	}
 
 
@@ -173,24 +174,30 @@ loop_high_acceleration:
   
 	while(true)
 	{
-    for(int i =0;i < ALTITUDE_BUFFER_SIZE i=; i++){
-      altitudeBuffer[i]=altitudeBuffer[i+1]
+    for(int i =0;i < ALTITUDE_BUFFER_SIZE; i++){
+      altitudeBuffer[i]=altitudeBuffer[i+1];
     }
-    altitudeBuffer[ALTITUDE_BUFFER_SIZE]=altitude
-    float averageFirstHalf=0.0
-    for(int i =0;i < floor(ALTITUDE_BUFFER_SIZE/2.0) i=; i++){
-      averageFirstHalf+= altitudeBuffer[i]
+    altitudeBuffer[ALTITUDE_BUFFER_SIZE]=altitude;
+    float averageFirstHalf=0.0;
+    int count =0;
+    for(int i =0;i < floor(ALTITUDE_BUFFER_SIZE/2.0); i++){
+      averageFirstHalf+= altitudeBuffer[i];
+      count++;
     }
-    averageFirstHalf = averageFirstHalf/(floor(ALTITUDE_BUFFER_SIZE/2.0)-1)
-    float averageSecondHalf=0.0
-    for(int i =0;i < floor(ALTITUDE_BUFFER_SIZE/2.0) i=; i++){
-      averageSecondHalf+= altitudeBuffer[i]
+    averageFirstHalf = averageFirstHalf/count;
+    float averageSecondHalf=0.0;
+    int count2 =0;
+    for(int i =floor(ALTITUDE_BUFFER_SIZE/2.0);i < ALTITUDE_BUFFER_SIZE; i++){
+      averageSecondHalf+= altitudeBuffer[i];
+      count++;
     }
-    averageSecondHalf = averageSecondHalf/(floor(ALTITUDE_BUFFER_SIZE/2.0)-1)
-    if(averageFirstHalf > averageSecondHalf){
-      ba loop_begun_descent;
+    averageSecondHalf = averageSecondHalf/count2;
+    if(averageFirstHalf > averageSecondHalf)
+    {
+      goto loop_begun_descent;
     }
-    else{
+    else
+    {
 			updateData();
 		}
 	}
@@ -200,13 +207,19 @@ loop_begun_descent:
   
 	//begins the spin sampler sequence
   samplerFan.write(FAN_FULL_THROTTLE);
-	spinSampler()
+	spinSampler();
 	while(true) //turn the sampler while we fall until second parachute deployment
 	{
 		  //TODO: implement sampler decision structure
   		updateData();
-      if (altitude <= MAIN_CHUTE_DEPLOYMENT_ALTITUDE) {deployChute(MAIN_CHUTE_PIN);}
-      if (samplerFilter == 0){ba loop_final_descent;}
+      if (altitude <= MAIN_CHUTE_DEPLOYMENT_ALTITUDE)
+      {
+        deployChute(MAIN_CHUTE_PIN);
+      }
+      if (samplerFilter == 0)
+      {
+        goto loop_final_descent;
+      }
 	}
   samplerFan.write(FAN_ARMED_ZERO_THRUST);
 
@@ -218,10 +231,24 @@ loop_final_descent:
 	}
 }
 
+void updateData() {
+  //TODO: Get and interpret data
+  
+  timeNow = millis();
+  char dataString= timeNow + "|" + altitude+ 
+  '|'+ x_accel + "|" + y_accel + "|" + z_accel + '\n';
+  char gps_str= timeNow +'|' + coords + '\n';
+  mag_str= timeNow + '|' +coords+ '\n';
+  
+  writeData();
+  sendAllData();
+}
+
+
 //Deploy parachute
-private void deployChute(int chutePin)
+void deployChute(int chutePin)
 {
-  timeNow = millis()
+  timeNow = millis();
   digitalWrite(chutePin, HIGH); //fire parachute 
   logFile.println("Parachute " + String(chutePin, DEC) + " fired " + String(timeNow, DEC) + " milliseconds after program start and at an altitude of " + String(altitude, DEC));
   
@@ -242,41 +269,29 @@ and the current time
 */
 std::string dataString
 
-private void updateData() {
-  //TODO: Get and interpret data
-  
-  timeNow = milis();
-  baro_str= timeNow + " " + altitude + "\n";
-  acc_str= timeNow + ' '+ x_accel + " " + y_accel + " " + z_accel + '\n';
-  gps_str= timeNow +' ' + coords + '\n';
-  mag_str= timeNow + ' ' +coords+ '\n';
-  
-  writeData();
-  sendAllData();
-}
 
 /*
 Second support function to write all data to SD card.
 */
 
-private void writeData() {
+void writeData() {
+
 	dataFile.println();
 }
 
 /*
 Third support function to send all data to computer via downlink
 */
-private void sendAllData() {
-  DOWLINK_SERIAL.print(dataString);
+void sendAllData() {
+  DOWNLINK_SERIAL.print(dataString);
 }
 
 /*
 Method to spin the sampler and keep track of what filter it's on.
 */
 // Pins are 26,27,28,25
-private void spinSampler() {
+void spinSampler() {
   samplerStepper.step(STEPS_PER_FILTER);
   samplerFilter++;
-  
   logFile.println("Spun to filter " + String(samplerFilter, DEC) + " at " +  String(altitude, DEC) + " meters above sea level and at approximately " + String(millis(), DEC) + " seconds after startup");
 }
