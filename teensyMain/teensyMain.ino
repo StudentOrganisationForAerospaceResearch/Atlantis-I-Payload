@@ -141,21 +141,20 @@ we will use sub loops like what we planned for the c++
 void loop() {
 	// loop to use after payload initialised
 	//TODO: Record the intial height
+  float altitude_baseline = 0;
+  
 	while(true)
 	{
-		if(altitude > 50 +altitude_baseline) //Compare against initial height
+		if(altitude > 50 + altitude_baseline) //Compare against initial height
 		{
 			 logFile.println("Altitude change of 50 meters exceeded at " + String(millis(), DEC));
 			 goto loop_high_acceleration;
 		}
-		else
-		{
-			updateData();
-		}
+		updateData();
 	}
 	
 loop_launch_started:
-	// we need accurate acceleration curves, 2 g is the initial guess
+	//TODO: we need accurate acceleration curves, 2 g is the initial guess
 	while(true)
 	{
 		if(pow(pow(x_accel, 2) + pow(y_accel, 2) + pow(z_accel,2), 0.5) <= 15) //Take the magnitude of acceleration and wait until it is smaller than 15 m/s^2
@@ -173,32 +172,30 @@ loop_high_acceleration:
   
 	while(true)
 	{
-    for(int i =0;i < ALTITUDE_BUFFER_SIZE; i++){
+    //Update altitude buffer
+    for(int i = 0; i < ALTITUDE_BUFFER_SIZE; i++){
       altitudeBuffer[i]=altitudeBuffer[i+1];
     }
-    altitudeBuffer[ALTITUDE_BUFFER_SIZE]=altitude;
-    float averageFirstHalf=0.0;
-    int count =0;
-    for(int i =0;i < floor(ALTITUDE_BUFFER_SIZE/2.0); i++){
+    altitudeBuffer[ALTITUDE_BUFFER_SIZE] = altitude;
+
+    //Average of the first hald of the buffer
+    float averageFirstHalf = 0.0;
+    int count = floor(ALTITUDE_BUFFER_SIZE/2.0);
+    for(int i = 0; i < floor(ALTITUDE_BUFFER_SIZE/2.0); i++){
       averageFirstHalf+= altitudeBuffer[i];
-      count++;
     }
     averageFirstHalf = averageFirstHalf/count;
-    float averageSecondHalf=0.0;
-    int count2 =0;
-    for(int i =floor(ALTITUDE_BUFFER_SIZE/2.0);i < ALTITUDE_BUFFER_SIZE; i++){
-      averageSecondHalf+= altitudeBuffer[i];
-      count++;
+    
+    float averageSecondHalf = 0.0;
+    int count2 = ALTITUDE_BUFFER_SIZE - floor(ALTITUDE_BUFFER_SIZE/2.0);
+    for(int i = floor(ALTITUDE_BUFFER_SIZE/2.0); i < ALTITUDE_BUFFER_SIZE; i++){
+      averageSecondHalf += altitudeBuffer[i];
     }
     averageSecondHalf = averageSecondHalf/count2;
-    if(averageFirstHalf > averageSecondHalf)
-    {
-      goto loop_begun_descent;
-    }
-    else
-    {
-			updateData();
-		}
+
+    //Check for descent
+    if(averageFirstHalf > averageSecondHalf){goto loop_begun_descent;}
+    else{updateData();}
 	}
  
 loop_begun_descent:
@@ -242,7 +239,6 @@ void updateData() {
   char s_acc_y[7];
   char s_acc_z[7];
   
-
   char s_ang_acc_x[7];
   char s_ang_acc_y[7];
   char s_ang_acc_z[7];
@@ -258,30 +254,35 @@ void updateData() {
   char s_pitch[7];
   char s_yaw[7];
   char s_roll[7];
-  
-  dtostrf(x_accel, 6,2,s_acc_x);
-  dtostrf(y_accel, 6,2,s_acc_y);
-  dtostrf(z_accel, 8,2,s_acc_z);
 
-  dtostrf(ang_accel_x, 6,2,s_ang_acc_x);
-  dtostrf(ang_accel_y, 6,2,s_ang_acc_y);
-  dtostrf(ang_accel_z, 6,2,s_ang_acc_z);
+  char longitude[9];
+  char latitude[9];
 
-  dtostrf(mag_x, 6,2,s_mag_x);
-  dtostrf(mag_y, 6,2,s_mag_y);
-  dtostrf(mag_z, 6,2,s_mag_z);
+  char data_string[143];
   
-  dtostrf(altitude, 8,2,s_altitude);
-  dtostrf(pressure, 8,2,s_pressure);
-  dtostrf(temperature, 6,2,s_temperature);
-  
-  dtostrf(pitch, 8,2,s_pitch);
-  dtostrf(roll, 8,2,s_roll);
-  dtostrf(yaw, 6,2,s_yaw);
+  dtostrf(x_accel, 6,2, s_acc_x);
+  dtostrf(y_accel, 6,2, s_acc_y);
+  dtostrf(z_accel, 8,2, s_acc_z);
 
+  dtostrf(ang_accel_x, 6,2, s_ang_acc_x);
+  dtostrf(ang_accel_y, 6,2, s_ang_acc_y);
+  dtostrf(ang_accel_z, 6,2, s_ang_acc_z);
 
+  dtostrf(mag_x, 6,2, s_mag_x);
+  dtostrf(mag_y, 6,2, s_mag_y);
+  dtostrf(mag_z, 6,2, s_mag_z);
   
-  dataFile.println();
+  dtostrf(altitude, 8,2, s_altitude);
+  dtostrf(pressure, 8,2, s_pressure);
+  dtostrf(temperature, 6,2, s_temperature);
+  
+  dtostrf(pitch, 8,2, s_pitch);
+  dtostrf(roll, 8,2, s_roll);
+  dtostrf(yaw, 6,2, s_yaw);
+
+  //TODO: Combine strings
+  
+  dataFile.println(dataString);
   DOWNLINK_SERIAL.print(dataString);
 }
 
@@ -308,7 +309,7 @@ Method to spin the sampler and keep track of what filter it's on.
 */
 // Pins are 26,27,28,25
 void spinSampler() {
-  if (samplerFilter < NUM_FILTERS){  // So it won't fire if it is activated too many times
+  if (samplerFilter <= NUM_FILTERS){  // So it won't fire if it is activated too many times
     samplerStepper.step(STEPS_PER_FILTER);
     samplerFilter++;
     logFile.println("Spun to filter " + String(samplerFilter, DEC) + " at " +  String(altitude, DEC) + " meters above sea level and at approximately " + String(millis(), DEC) + " seconds after startup");
