@@ -6,7 +6,6 @@
 #include <math.h>
 #include <string.h>
 #include <Adafruit_BMP085_U.h>
-//#include <SD.h>
 #include <SdFat.h>
 
 /*****************************************************************/
@@ -22,8 +21,8 @@
 #define IMU_SERIAL Serial3
 
 //Parachute triggers
-#define MAIN_CHUTE_PIN PIN_D6
-#define DROGUE_CHUTE_PIN PIN_D7
+#define MAIN_CHUTE_PIN 22
+#define DROGUE_CHUTE_PIN 21
 
 //Sampler pin
 #define FAN_PIN 23
@@ -69,8 +68,8 @@ File logFile;
 unsigned long timeNow;
 unsigned long targetTime;
 
-samplerFan Servo;
-samplerStepper Stepper; 
+Servo samplerFan;
+Stepper samplerStepper; 
 
 //Sensor variables
 float x_accel;
@@ -231,6 +230,9 @@ loop_final_descent:
 	}
 }
 
+/*
+Function to fetch and update all data sources and listeners
+*/
 void updateData() {
   //TODO: Get and interpret data
   
@@ -279,8 +281,8 @@ void updateData() {
 
 
   
-  writeData();
-  sendAllData();
+  dataFile.println();
+  DOWNLINK_SERIAL.print(dataString);
 }
 
 
@@ -299,30 +301,6 @@ void deployChute(int chutePin)
   }
 
   digitalWrite(chutePin, LOW); //Stop sending signal to fire parchutes in case of a short
-}
-
-/*
-Main support function to update all the data
-updatedata will call writeData and sendAllData at the end of it
-and the current time
-*/
-
-
-
-/*
-Second support function to write all data to SD card.
-*/
-
-void writeData() {
-
-	dataFile.println();
-}
-
-/*
-Third support function to send all data to computer via downlink
-*/
-void sendAllData(char dataString) {
-  DOWNLINK_SERIAL.print(dataString);
 }
 
 /*
