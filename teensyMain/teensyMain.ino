@@ -21,8 +21,8 @@
 #define IMU_SERIAL Serial3
 
 //Parachute triggers
-#define MAIN_CHUTE_PIN PIN_D6
-#define DROGUE_CHUTE_PIN PIN_D7
+#define MAIN_CHUTE_PIN 22
+#define DROGUE_CHUTE_PIN 21
 
 //Sampler pin
 #define FAN_PIN 23
@@ -226,9 +226,7 @@ private void deployChute(int chutePin)
 }
 
 /*
-Main support function to update all the data
-updatedata will call writeData and sendAllData at the end of it
-and the current time
+Function to fetch and update all data sources and listeners
 */
 std::string dataString
 
@@ -241,22 +239,7 @@ private void updateData() {
   gps_str= timeNow +' ' + coords + '\n';
   mag_str= timeNow + ' ' +coords+ '\n';
   
-  writeData();
-  sendAllData();
-}
-
-/*
-Second support function to write all data to SD card.
-*/
-
-private void writeData() {
-	dataFile.println();
-}
-
-/*
-Third support function to send all data to computer via downlink
-*/
-private void sendAllData() {
+  dataFile.println(data);
   DOWLINK_SERIAL.print(dataString);
 }
 
