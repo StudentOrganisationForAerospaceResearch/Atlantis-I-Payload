@@ -5,7 +5,7 @@
 #include <Wire.h>
 #include <math.h>
 #include <string.h>
-#include <Adafruit_BMP085.h>
+#include <Adafruit_BMP085_U.h>
 #include <SdFat.h>
 
 /*****************************************************************/
@@ -72,9 +72,9 @@ Servo samplerFan;
 Stepper samplerStepper; 
 
 //Sensor variables
-float lin_accel_x;
-float lin_accel_y;
-float lin_accel_z;
+float x_accel;
+float y_accel;
+float z_accel;
 
 float ang_accel_x;
 float ang_accel_y;
@@ -110,7 +110,7 @@ void setup() {
     ; // wait for serial port to connect. Needed for native USB port only
   }
   
-  DOWLINK_SERIAL.begin(9600);
+  DOWNLINK_SERIAL.begin(9600);
   GPS_SERIAL.begin(9600);
   IMU_SERIAL.begin(57600);
 
@@ -123,7 +123,7 @@ void setup() {
   samplerStepper = myStepper(stepsPerRevolution, 26, 27, 28, 25);
 
   if (!SD.begin(SD_CS_PIN)) {
-    Serial.println("initialization failed!");
+    Serial.println("Initialization failed!");
     return;
   }
   
@@ -143,14 +143,14 @@ void loop() {
 	//TODO: Record the intial height
 	while(true)
 	{
-		if() //Compare against initial height
+		if(altitude > 50 +altitude_baseline) //Compare against initial height
 		{
 			 logFile.println("Altitude change of 50 meters exceeded at " + String(millis(), DEC));
-			 ba loop_high_acceleration;
+			 goto loop_high_acceleration;
 		}
 		else
 		{
-			updatedata();
+			updateData();
 		}
 	}
 	
@@ -158,30 +158,46 @@ loop_launch_started:
 	// we need accurate acceleration curves, 2 g is the initial guess
 	while(true)
 	{
-		if(pow(pow(x_accel, 2) + pow(y_accel, 2) + pow(z_accel), 0.5) <= 15) //Take the magnitude of acceleration and wait until it is smaller than 15 m/s^2
+		if(pow(pow(x_accel, 2) + pow(y_accel, 2) + pow(z_accel,2), 0.5) <= 15) //Take the magnitude of acceleration and wait until it is smaller than 15 m/s^2
 		{
 			 logFile.println("Acceleration dropped to normal levels at "+ String(millis(), DEC));
-			 ba loop_high_acceleration;
+			 goto loop_high_acceleration;
 		}
-		updatedata();
+		updateData();
 	}
-	
+
+
 loop_high_acceleration:
   //take data while waiting for max height
 	float altitudeBuffer[ALTITUDE_BUFFER_SIZE] = {altitude};
   
 	while(true)
 	{
-		if(max_alt - 20 > altitude)
-		{
-			max_alt = altitude;
+    for(int i =0;i < ALTITUDE_BUFFER_SIZE; i++){
+      altitudeBuffer[i]=altitudeBuffer[i+1];
+    }
+    altitudeBuffer[ALTITUDE_BUFFER_SIZE]=altitude;
+    float averageFirstHalf=0.0;
+    int count =0;
+    for(int i =0;i < floor(ALTITUDE_BUFFER_SIZE/2.0); i++){
+      averageFirstHalf+= altitudeBuffer[i];
+      count++;
+    }
+    averageFirstHalf = averageFirstHalf/count;
+    float averageSecondHalf=0.0;
+    int count2 =0;
+    for(int i =floor(ALTITUDE_BUFFER_SIZE/2.0);i < ALTITUDE_BUFFER_SIZE; i++){
+      averageSecondHalf+= altitudeBuffer[i];
+      count++;
+    }
+    averageSecondHalf = averageSecondHalf/count2;
+    if(averageFirstHalf > averageSecondHalf)
+    {
+      goto loop_begun_descent;
+    }
+    else
+    {
 			updateData();
-		}
-		else
-		{
-		  baroFile << "Max altitude: " << altitude << endl;
-		  //TODO: send max alt via downlink
-			ba loop_begun_descent;
 		}
 	}
  
@@ -190,13 +206,19 @@ loop_begun_descent:
   
 	//begins the spin sampler sequence
   samplerFan.write(FAN_FULL_THROTTLE);
-	spinSampler()
+	spinSampler();
 	while(true) //turn the sampler while we fall until second parachute deployment
 	{
 		  //TODO: implement sampler decision structure
   		updateData();
-      if (altitude <= MAIN_CHUTE_DEPLOYMENT_ALTITUDE) {deployChute(MAIN_CHUTE_PIN);}
-      if (samplerFilter == 0){ba loop_final_descent;}
+      if (altitude <= MAIN_CHUTE_DEPLOYMENT_ALTITUDE)
+      {
+        deployChute(MAIN_CHUTE_PIN);
+      }
+      if (samplerFilter == 0)
+      {
+        goto loop_final_descent;
+      }
 	}
   samplerFan.write(FAN_ARMED_ZERO_THRUST);
 
@@ -208,10 +230,66 @@ loop_final_descent:
 	}
 }
 
+/*
+Function to fetch and update all data sources and listeners
+*/
+void updateData() {
+  //TODO: Get and interpret data
+  
+  timeNow = millis();
+
+  char s_acc_x[7];
+  char s_acc_y[7];
+  char s_acc_z[7];
+  
+
+  char s_ang_acc_x[7];
+  char s_ang_acc_y[7];
+  char s_ang_acc_z[7];
+
+  char s_mag_x[7];
+  char s_mag_y[7];
+  char s_mag_z[7];
+
+  char s_altitude[9];
+  char s_temperature[7];
+  char s_pressure[9];
+
+  char s_pitch[7];
+  char s_yaw[7];
+  char s_roll[7];
+  
+  dtostrf(x_accel, 6,2,s_acc_x);
+  dtostrf(y_accel, 6,2,s_acc_y);
+  dtostrf(z_accel, 8,2,s_acc_z);
+
+  dtostrf(ang_accel_x, 6,2,s_ang_acc_x);
+  dtostrf(ang_accel_y, 6,2,s_ang_acc_y);
+  dtostrf(ang_accel_z, 6,2,s_ang_acc_z);
+
+  dtostrf(mag_x, 6,2,s_mag_x);
+  dtostrf(mag_y, 6,2,s_mag_y);
+  dtostrf(mag_z, 6,2,s_mag_z);
+  
+  dtostrf(altitude, 8,2,s_altitude);
+  dtostrf(pressure, 8,2,s_pressure);
+  dtostrf(temperature, 6,2,s_temperature);
+  
+  dtostrf(pitch, 8,2,s_pitch);
+  dtostrf(roll, 8,2,s_roll);
+  dtostrf(yaw, 6,2,s_yaw);
+
+
+  
+  dataFile.println();
+  DOWNLINK_SERIAL.print(dataString);
+}
+
+
 //Deploy parachute
-private void deployChute(int chutePin)
+void deployChute(int chutePin)
 {
-  timeNow = millis()
+  timeNow = millis();
   digitalWrite(chutePin, HIGH); //fire parachute 
   logFile.println("Parachute " + String(chutePin, DEC) + " fired " + String(timeNow, DEC) + " milliseconds after program start and at an altitude of " + String(altitude, DEC));
   
@@ -226,30 +304,13 @@ private void deployChute(int chutePin)
 }
 
 /*
-Function to fetch and update all data sources and listeners
-*/
-std::string dataString
-
-private void updateData() {
-  //TODO: Get and interpret data
-  
-  timeNow = milis();
-  baro_str= timeNow + " " + altitude + "\n";
-  acc_str= timeNow + ' '+ x_accel + " " + y_accel + " " + z_accel + '\n';
-  gps_str= timeNow +' ' + coords + '\n';
-  mag_str= timeNow + ' ' +coords+ '\n';
-  
-  dataFile.println(data);
-  DOWLINK_SERIAL.print(dataString);
-}
-
-/*
 Method to spin the sampler and keep track of what filter it's on.
 */
 // Pins are 26,27,28,25
-private void spinSampler() {
-  samplerStepper.step(STEPS_PER_FILTER);
-  samplerFilter++;
-  
-  logFile.println("Spun to filter " + String(samplerFilter, DEC) + " at " +  String(altitude, DEC) + " meters above sea level and at approximately " + String(millis(), DEC) + " seconds after startup");
+void spinSampler() {
+  if (samplerFilter < NUM_FILTERS){  // So it won't fire if it is activated too many times
+    samplerStepper.step(STEPS_PER_FILTER);
+    samplerFilter++;
+    logFile.println("Spun to filter " + String(samplerFilter, DEC) + " at " +  String(altitude, DEC) + " meters above sea level and at approximately " + String(millis(), DEC) + " seconds after startup");
+  }
 }
