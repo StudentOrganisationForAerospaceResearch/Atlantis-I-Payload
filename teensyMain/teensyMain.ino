@@ -6,17 +6,15 @@
 #include <math.h>
 #include <string.h>
 #include <Adafruit_BMP085.h> // Barometer Library
-#include <SD.h>
-
+#include <SD.h>  // Default Arduino Library Supports it
+#include <TinyGPS.h> //TinyGPS library
 /*****************************************************************/
 /*********** USER SETUP AREA! Set your options here! *************/
 /*****************************************************************/
 
 
-//Sensor Constants and defintions
-#define SEA_LVL_PRESSURE 101800 //current sea level equivalent pressure for your location. used for calibration. 
 
-Adafruit_BMP085 baro;
+
 
 // HARDWARE OPTIONS
 /*****************************************************************/
@@ -26,6 +24,8 @@ Adafruit_BMP085 baro;
 #define GPS_SERIAL Serial2
 #define IMU_SERIAL Serial3
 
+Adafruit_BMP085 baro;
+TinyGPS gps;
 //Parachute triggers
 #define MAIN_CHUTE_PIN 22
 #define DROGUE_CHUTE_PIN 21
@@ -61,8 +61,11 @@ const int STEPPER_PIN_3=39;
 // FLIGHT OPTIONS
 /*****************************************************************/
 #define MAIN_CHUTE_DEPLOYMENT_ALTITUDE 1000 //In meters above initial altitude
-#define NUM_FILTERS 7
+#define NUM_FILTERS 6
 #define ALTITUDE_BUFFER_SIZE 10
+//Sensor Constants and defintions
+#define SEA_LVL_PRESSURE 101800 //current sea level equivalent pressure for your location. used for calibration. 
+
 
 // DEBUG OPTIONS
 /*****************************************************************/
@@ -73,6 +76,7 @@ const int STEPPER_PIN_3=39;
 /*****************************************************************/
 
 //Output files
+
 
 File dataFile;
 File logFile;
@@ -108,8 +112,9 @@ float yaw;
 float roll;
 
 //TODO: probably need something to record N/S for coords
-float longitude;
-float latitude;
+long longitude = 0;
+long latitude=0;
+float altitude_gps=0;
 
 //Keep track of what filter we're on
 int samplerFilter;
@@ -253,6 +258,7 @@ void updateData() {
   pressure = baro.readPressure();
   altitude = baro.readAltitude(SEA_LVL_PRESSURE);
 
+  parseGPSStream();
   // Prepares string for logging and telemetry purposes
   String dataString = 
     "$" + 
@@ -274,10 +280,15 @@ void updateData() {
 
     String(pitch) + "|" + 
     String(roll) + "|" + 
-    String(yaw)  +
- "*";
-
-  //TODO: Combine strings
+    String(yaw)  + "|" +
+    
+    String(latitude) +"|" +
+    String(longitude) + "|" +
+    String(altitude_gps) +
+    "*";
+  while(sizeof(dataString) < 250){
+    dataString=dataString+"*";
+  }
   
   dataFile.println(dataString);
   dataFile.flush();
@@ -311,5 +322,21 @@ void spinSampler() {
     samplerStepper.step(STEPS_PER_FILTER);
     samplerFilter++;
     logFile.println("Spun to filter " + String(samplerFilter, DEC) + " at " +  String(altitude, DEC) + " meters above sea level and at approximately " + String(millis(), DEC) + " seconds after startup");
+  }
+}
+
+/******************************************************************************
+  Parse GPS
+******************************************************************************/
+
+void parseGPSStream() { 
+  while (GPS_SERIAL.available()){
+    int c = GPS_SERIAL.read();
+    if(gps.encode(c)){//if statement is true if a full string has been read
+      if(gps.satellites() > 1){
+        gps.get_position(&latitude, &longitude);
+        altitude_gps = gps.altitude()/100.0;
+      }
+    }
   }
 }
