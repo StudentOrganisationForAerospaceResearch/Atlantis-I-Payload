@@ -1,5 +1,27 @@
 /* This file is part of the Razor AHRS Firmware */
 
+// Output both angles and sensors: yaw/pitch/roll/acccel/mag/gyro
+// Only set up for OUTPUT__FORMAT_TEXT so far
+void output_both()
+{
+    Serial.print(TO_DEG(yaw)); Serial.print("|");
+    Serial.print(TO_DEG(pitch)); Serial.print("|");
+    Serial.print(TO_DEG(roll)); Serial.print("|");
+    
+    Serial.print(accel[0]); Serial.print("|");
+    Serial.print(accel[1]); Serial.print("|");
+    Serial.print(accel[2]); Serial.print("|");
+
+    Serial.print(magnetom[0]); Serial.print("|");
+    Serial.print(magnetom[1]); Serial.print("|");
+    Serial.print(magnetom[2]); Serial.print("|");
+
+    Serial.print(gyro[0]); Serial.print("|");
+    Serial.print(gyro[1]); Serial.print("|");
+    Serial.print(gyro[2]); Serial.println();
+}
+
+
 // Output angles: yaw, pitch, roll
 void output_angles()
 {

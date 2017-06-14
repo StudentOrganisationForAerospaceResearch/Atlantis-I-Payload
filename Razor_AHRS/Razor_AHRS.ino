@@ -180,12 +180,13 @@
 #define OUTPUT__MODE_SENSORS_CALIB 2 // Outputs calibrated sensor values for all 9 axes
 #define OUTPUT__MODE_SENSORS_RAW 3 // Outputs raw (uncalibrated) sensor values for all 9 axes
 #define OUTPUT__MODE_SENSORS_BOTH 4 // Outputs calibrated AND raw sensor values for all 9 axes
+#define OUTPUT__MODE_ANGLES_AND_RAW 5 //Outputs calibrated AND yaw/pitch/roll in degrees. Currently unlabelled, but formatted as y/p/r/accel/mag/gyro
 // Output format definitions (do not change)
 #define OUTPUT__FORMAT_TEXT 0 // Outputs data as text
 #define OUTPUT__FORMAT_BINARY 1 // Outputs data as binary float
 
 // Select your startup output mode and format here!
-int output_mode = OUTPUT__MODE_ANGLES;
+int output_mode = OUTPUT__MODE_ANGLES_AND_RAW;
 int output_format = OUTPUT__FORMAT_TEXT;
 
 // Select if serial continuous streaming output is enabled per default on startup.
@@ -644,6 +645,20 @@ void loop()
       Euler_angles();
       
       if (output_stream_on || output_single_on) output_angles();
+    }
+    else if (output_mode == OUTPUT__MODE_ANGLES_AND_RAW)
+    {
+      // Apply sensor calibration
+      compensate_sensor_errors();
+    
+      // Run DCM algorithm
+      Compass_Heading(); // Calculate magnetic heading
+      Matrix_update();
+      Normalize();
+      Drift_correction();
+      Euler_angles();
+      
+      if (output_stream_on || output_single_on) output_both();
     }
     else  // Output sensor values
     {      
