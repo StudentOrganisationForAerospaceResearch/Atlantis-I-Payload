@@ -5,12 +5,18 @@
 #include <Wire.h>
 #include <math.h>
 #include <string.h>
-#include <Adafruit_BMP085_U.h>
-#include <SdFat.h>
+#include <Adafruit_BMP085.h> // Barometer Library
+#include <SD.h>
 
 /*****************************************************************/
 /*********** USER SETUP AREA! Set your options here! *************/
 /*****************************************************************/
+
+
+//Sensor Constants and defintions
+#define SEA_LVL_PRESSURE 101800 //current sea level equivalent pressure for your location. used for calibration. 
+
+Adafruit_BMP085 baro;
 
 // HARDWARE OPTIONS
 /*****************************************************************/
@@ -45,6 +51,13 @@
  */
 #define SD_CS_PIN SS
 
+// Sampler Pins
+// Update these !!!!!
+const int STEPPER_PIN_0=37; //??
+const int STEPPER_PIN_1=38;
+const int STEPPER_PIN_2=36;
+const int STEPPER_PIN_3=39;
+
 // FLIGHT OPTIONS
 /*****************************************************************/
 #define MAIN_CHUTE_DEPLOYMENT_ALTITUDE 1000 //In meters above initial altitude
@@ -60,16 +73,18 @@
 /*****************************************************************/
 
 //Output files
-SdFat SD;
+
 File dataFile;
 File logFile;
+Servo samplerFan;
+Stepper samplerStepper(STEPS_PER_REVOLUTION,STEPPER_PIN_0,STEPPER_PIN_1,STEPPER_PIN_2,STEPPER_PIN_3);
+
 
 //Time variables **time recorded is time after program starts**
 unsigned long timeNow;
 unsigned long targetTime;
 
-Servo samplerFan;
-Stepper samplerStepper; 
+
 
 //Sensor variables
 float x_accel;
@@ -120,7 +135,6 @@ void setup() {
   samplerFan.attach(FAN_PIN);
   samplerFan.write(FAN_ARMED_ZERO_THRUST);
 
-  samplerStepper = myStepper(stepsPerRevolution, 26, 27, 28, 25);
 
   if (!SD.begin(SD_CS_PIN)) {
     Serial.println("Initialization failed!");
@@ -148,7 +162,7 @@ void loop() {
 		if(altitude > 50 + altitude_baseline) //Compare against initial height
 		{
 			 logFile.println("Altitude change of 50 meters exceeded at " + String(millis(), DEC));
-			 goto loop_high_acceleration;
+			 goto loop_launch_started;
 		}
 		updateData();
 	}
@@ -168,15 +182,16 @@ loop_launch_started:
 
 loop_high_acceleration:
   //take data while waiting for max height
-	float altitudeBuffer[ALTITUDE_BUFFER_SIZE] = {altitude};
+	float altitudeBuffer[ALTITUDE_BUFFER_SIZE];
+  memset(altitudeBuffer,0,sizeof(altitudeBuffer));
   
 	while(true)
 	{
     //Update altitude buffer
-    for(int i = 0; i < ALTITUDE_BUFFER_SIZE; i++){
-      altitudeBuffer[i]=altitudeBuffer[i+1];
+    for(int i = 1; i < ALTITUDE_BUFFER_SIZE; i++){
+      altitudeBuffer[i-1]=altitudeBuffer[i];
     }
-    altitudeBuffer[ALTITUDE_BUFFER_SIZE] = altitude;
+    altitudeBuffer[ALTITUDE_BUFFER_SIZE-1] = altitude;
 
     //Average of the first hald of the buffer
     float averageFirstHalf = 0.0;
@@ -232,57 +247,40 @@ Function to fetch and update all data sources and listeners
 */
 void updateData() {
   //TODO: Get and interpret data
-  
+
+  //Updates sensor variables
   timeNow = millis();
+  pressure = baro.readPressure();
+  altitude = baro.readAltitude(SEA_LVL_PRESSURE);
 
-  char s_acc_x[7];
-  char s_acc_y[7];
-  char s_acc_z[7];
-  
-  char s_ang_acc_x[7];
-  char s_ang_acc_y[7];
-  char s_ang_acc_z[7];
+  // Prepares string for logging and telemetry purposes
+  String dataString = 
+    "$" + 
+    String(temperature) + "|" + 
+    String(pressure) + "|" +
+    String(altitude) + "|" + 
 
-  char s_mag_x[7];
-  char s_mag_y[7];
-  char s_mag_z[7];
+    String(ang_accel_x) + "|" +
+    String(ang_accel_y) + "|" +
+    String(ang_accel_z) + "|" +
+    
+    String(x_accel) + "|" +
+    String(y_accel) + "|" +
+    String(z_accel) + "|" +
+    
+    String(mag_x) + "|" + 
+    String(mag_y) + "|" + 
+    String(mag_z) + "|" +
 
-  char s_altitude[9];
-  char s_temperature[7];
-  char s_pressure[9];
-
-  char s_pitch[7];
-  char s_yaw[7];
-  char s_roll[7];
-
-  char longitude[9];
-  char latitude[9];
-
-  char data_string[143];
-  
-  dtostrf(x_accel, 6,2, s_acc_x);
-  dtostrf(y_accel, 6,2, s_acc_y);
-  dtostrf(z_accel, 8,2, s_acc_z);
-
-  dtostrf(ang_accel_x, 6,2, s_ang_acc_x);
-  dtostrf(ang_accel_y, 6,2, s_ang_acc_y);
-  dtostrf(ang_accel_z, 6,2, s_ang_acc_z);
-
-  dtostrf(mag_x, 6,2, s_mag_x);
-  dtostrf(mag_y, 6,2, s_mag_y);
-  dtostrf(mag_z, 6,2, s_mag_z);
-  
-  dtostrf(altitude, 8,2, s_altitude);
-  dtostrf(pressure, 8,2, s_pressure);
-  dtostrf(temperature, 6,2, s_temperature);
-  
-  dtostrf(pitch, 8,2, s_pitch);
-  dtostrf(roll, 8,2, s_roll);
-  dtostrf(yaw, 6,2, s_yaw);
+    String(pitch) + "|" + 
+    String(roll) + "|" + 
+    String(yaw)  +
+ "*";
 
   //TODO: Combine strings
   
   dataFile.println(dataString);
+  dataFile.flush();
   DOWNLINK_SERIAL.print(dataString);
 }
 
@@ -307,7 +305,7 @@ void deployChute(int chutePin)
 /*
 Method to spin the sampler and keep track of what filter it's on.
 */
-// Pins are 26,27,28,25
+// Pins are still needed to know
 void spinSampler() {
   if (samplerFilter <= NUM_FILTERS){  // So it won't fire if it is activated too many times
     samplerStepper.step(STEPS_PER_FILTER);
