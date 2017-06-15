@@ -66,6 +66,7 @@
 // DEBUG OPTIONS
 /*****************************************************************/
 #define SERIAL_DEBUGGING true
+#define SKIP_SAFETY_CHECKS false //************BE VERY CAREFUL TO DISABLE THIS BEFORE WIRING CHARGE************
 
 /*****************************************************************/
 /****************** END OF USER SETUP AREA!  *********************/
@@ -111,7 +112,7 @@ float altitude_baseline;
 //Keep track of what filter we're on
 int filterNumber;
 
-boolean mainChuteDeployed;
+unsigned long lastCommunication;
 
 /*
 Setup method. Initiates all variables and files
@@ -127,7 +128,7 @@ void setup() {
   IMU_SERIAL.begin(57600);
 
   filterNumber = 0;
-  mainChuteDeployed = false;
+  lastCommunication = 0;
 
   samplerFan.attach(FAN_PIN);
   samplerFan.write(FAN_ARMED_ZERO_THRUST);
@@ -156,7 +157,7 @@ we will use sub loops like what we planned for the c++
 */
 void loop() {
 	// loop to use after payload initialised
-  Serial.println("Grabbing first data.");
+  if (SERIAL_DEBUGGING) {Serial.println("Grabbing first data.");}
 	updateData();
   altitude_baseline = altitude;
 
@@ -238,7 +239,7 @@ loop_begun_descent:
      {
       spinSampler();
      }
-     if (altitude < 3048) //If it's lower than 10000ft, no use in collecting data anymore.
+     else if (altitude < 3048) //If it's lower than 10000ft, no use in collecting data anymore.
      {
       spinSampler(); // Should spin us to filter 5 if everything went well. Otherwise, will spin to unused filter. Check log for details
       goto loop_final_descent;
@@ -311,7 +312,12 @@ void updateData() {
   if (SERIAL_DEBUGGING) {Serial.print(dataString);}
   dataFile.println(dataString);
   dataFile.flush();
-  DOWNLINK_SERIAL.print(dataString);
+
+  if (lastCommunication + TIME_BETWEEN_COMMUNICATIONS < millis())
+  {
+    DOWNLINK_SERIAL.print(dataString);
+    lastCommunication = millis();
+  }
 }
 
 
