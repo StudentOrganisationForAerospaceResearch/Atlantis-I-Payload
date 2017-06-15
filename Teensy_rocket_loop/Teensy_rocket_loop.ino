@@ -52,13 +52,15 @@
 
 // FLIGHT OPTIONS
 /*****************************************************************/
-#define MAIN_CHUTE_DEPLOYMENT_ALTITUDE 1000 //In meters above initial altitude
 #define NUM_FILTERS 6
 #define ALTITUDE_BUFFER_SIZE 10
 #define ALTITUDE_TOLERANCE 50 //In meters
 
 //Sensor Constants and defintions
 #define SEA_LVL_PRESSURE 101800 //current sea level equivalent pressure for your location. used for calibration. 
+
+//Timing delay
+#define TIME_BETWEEN_COMMUNICATIONS 2000 //in ms
 
 
 // DEBUG OPTIONS
@@ -104,6 +106,8 @@ long longitude;
 long latitude;
 float altitude_gps;
 
+float altitude_baseline;
+
 //Keep track of what filter we're on
 int filterNumber;
 
@@ -137,8 +141,13 @@ void setup() {
   dataFile = SD.open("Data_MASTER.txt", FILE_WRITE);
   dataFile.println("# Data file initialised at system time " + String(millis(), DEC));
   dataFile.println("Columns in order w/(units): ");
+  dataFile.flush();
 
   logFile = SD.open("LOGS.txt", FILE_WRITE);
+  logFile.println("# Log file initialised at system time " + String(millis(), DEC));
+  logFile.flush();
+
+  Serial.println("Initialized. Starting main loop.");
 }
 
 /*
@@ -147,9 +156,10 @@ we will use sub loops like what we planned for the c++
 */
 void loop() {
 	// loop to use after payload initialised
+  Serial.println("Grabbing first data.");
 	updateData();
-  float altitude_baseline = altitude;
-  
+  altitude_baseline = altitude;
+
 	while(true)
 	{
 		if(altitude > ALTITUDE_TOLERANCE + altitude_baseline) //Compare against initial height
@@ -211,10 +221,26 @@ loop_begun_descent:
 	{
 		 updateData();
 
-     
-      
-     if (altitude < 3048)
+     //Sampler logic
+     if (altitude < 9144 && altitude > 6096 && filterNumber != 1) // 10000 ft distance between 30000 ft and 20000 ft
      {
+      spinSampler();
+     }
+     else if (altitude < 6096 && altitude > 4114.8 && filterNumber != 2) // 6500 ft distance between 20000 ft and 13500 ft
+     {
+      spinSampler();
+     }
+     else if (altitude < 4114.8 && altitude > 3352.8 && filterNumber != 3) // 2500 ft distance between 13500 ft and 11000 ft
+     {
+      spinSampler();
+     }
+     else if (altitude < 3352.8 && altitude > 3048 && filterNumber != 4) // 1000 ft distance between 11000 ft and 10000 ft
+     {
+      spinSampler();
+     }
+     if (altitude < 3048) //If it's lower than 10000ft, no use in collecting data anymore.
+     {
+      spinSampler(); // Should spin us to filter 5 if everything went well. Otherwise, will spin to unused filter. Check log for details
       goto loop_final_descent;
      }
 	}
@@ -234,11 +260,14 @@ loop_final_descent:
 Function to fetch and update all data sources and listeners
 */
 void updateData() {
+  
   //Updates barometer variables
+  Serial.println("Trying to get barometric pressure");
   pressure = baro.readPressure();
+  Serial.println("Got pressure data");
   altitude = baro.readAltitude(SEA_LVL_PRESSURE);
   temperature = baro.readTemperature();
-
+  
   //Updates gps variables
   parseGPSStream();
 
