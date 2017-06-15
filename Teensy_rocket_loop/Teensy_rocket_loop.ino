@@ -37,8 +37,8 @@
 #define STEPS_PER_FILTER 25
 
 #define STEPPER_PIN_IN1A 34
-#define STEPPER_PIN_IN2A 38
-#define STEPPER_PIN_IN1B 36
+#define STEPPER_PIN_IN2A 37
+#define STEPPER_PIN_IN1B 38
 #define STEPPER_PIN_IN2B 39
 
 //SD card
@@ -48,7 +48,7 @@
  ** MISO - pin 12
  ** CLK - pin 13
  */
-#define SD_CS_PIN SS
+#define SD_CS_PIN BUILTIN_SDCARD
 
 // FLIGHT OPTIONS
 /*****************************************************************/
@@ -63,7 +63,7 @@
 
 // DEBUG OPTIONS
 /*****************************************************************/
-//TODO: add debugging options
+#define SERIAL_DEBUGGING true
 
 /*****************************************************************/
 /****************** END OF USER SETUP AREA!  *********************/
@@ -75,7 +75,7 @@ File logFile;
 
 //Peripheral objects
 Servo samplerFan;
-Stepper samplerStepper(STEPS_PER_REVOLUTION,STEPPER_PIN_0,STEPPER_PIN_1,STEPPER_PIN_2,STEPPER_PIN_3);
+Stepper samplerStepper(STEPS_PER_REVOLUTION,STEPPER_PIN_IN1A,STEPPER_PIN_IN2A,STEPPER_PIN_IN1B,STEPPER_PIN_IN2B);
 Adafruit_BMP085 baro;
 TinyGPS gps;
 
@@ -211,9 +211,12 @@ loop_begun_descent:
 	{
 		 updateData();
 
-     //TODO: implement sampler decision structure
+     
       
-     if (filterNumber == 0){goto loop_final_descent;}
+     if (altitude < 3048)
+     {
+      goto loop_final_descent;
+     }
 	}
 
 loop_final_descent:
@@ -275,7 +278,8 @@ void updateData() {
   while(sizeof(dataString) < 250){
     dataString=dataString+"*";
   }
-  
+
+  if (SERIAL_DEBUGGING) {Serial.print(dataString);}
   dataFile.println(dataString);
   dataFile.flush();
   DOWNLINK_SERIAL.print(dataString);
@@ -318,12 +322,40 @@ void spinSampler() {
   Parse IMU and assign global variables.
 ******************************************************************************/
 void parseIMUStream() {
-  String temp;
+  String input;
+  char *temp;
+  char *token;
   
   while (IMU_SERIAL.available()){
-    temp = IMU_SERIAL.readString();
+    input = IMU_SERIAL.readString();
   }
 
+  strcpy(temp, input.c_str());
+
+  token = strtok(temp, "|");
+  yaw = atof(token);
+  token = strtok(NULL, "|");
+  pitch = atof(token);
+  token = strtok(NULL, "|");
+  roll = atof(token);
+  token = strtok(NULL, "|");
+  x_accel = atof(token);
+  token = strtok(NULL, "|");
+  y_accel = atof(token);
+  token = strtok(NULL, "|");
+  z_accel = atof(token);
+  token = strtok(NULL, "|");
+  ang_accel_x = atof(token);
+  token = strtok(NULL, "|");
+  ang_accel_y = atof(token);
+  token = strtok(NULL, "|");
+  ang_accel_z = atof(token);
+  token = strtok(NULL, "|");
+  mag_x = atof(token);
+  token = strtok(NULL, "|");
+  mag_y = atof(token);
+  token = strtok(NULL, "|");
+  mag_z = atof(token);
   
 }
 
