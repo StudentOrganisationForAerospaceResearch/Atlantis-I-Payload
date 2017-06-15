@@ -5,7 +5,7 @@
 #include <Wire.h>
 #include <math.h>
 #include <string.h>
-#include <Adafruit_BMP085.h> // Barometer Library
+#include <Adafruit_BMP085.h> // baroSensormeter Library
 #include <SD.h>  // Default Arduino Library Supports it
 #include <TinyGPS.h> //TinyGPS library
 
@@ -42,12 +42,6 @@
 #define STEPPER_PIN_IN2B 39
 
 //SD card
-/*
- * SD card attached to SPI bus as follows:
- ** MOSI - pin 11
- ** MISO - pin 12
- ** CLK - pin 13
- */
 #define SD_CS_PIN BUILTIN_SDCARD
 
 // FLIGHT OPTIONS
@@ -79,7 +73,7 @@ File logFile;
 //Peripheral objects
 Servo samplerFan;
 Stepper samplerStepper(STEPS_PER_REVOLUTION,STEPPER_PIN_IN1A,STEPPER_PIN_IN2A,STEPPER_PIN_IN1B,STEPPER_PIN_IN2B);
-Adafruit_BMP085 baro;
+Adafruit_BMP085 baroSensor;
 TinyGPS gps;
 
 //Sensor variables
@@ -108,6 +102,7 @@ long latitude;
 float altitude_gps;
 
 float altitude_baseline;
+float normalised_altitude;
 
 //Keep track of what filter we're on
 int filterNumber;
@@ -156,14 +151,13 @@ main loop
 we will use sub loops like what we planned for the c++
 */
 void loop() {
-	// loop to use after payload initialised
   if (SERIAL_DEBUGGING) {Serial.println("Grabbing first data.");}
 	updateData();
   altitude_baseline = altitude;
 
 	while(true)
 	{
-		if(altitude > ALTITUDE_TOLERANCE + altitude_baseline) //Compare against initial height
+		if(altitude > ALTITUDE_TOLERANCE + altitude_baseline || SKIP_SAFETY_CHECKS) //Compare against initial height
 		{
 			 logFile.println("Altitude change of 50 meters exceeded at " + String(millis(), DEC));
 			 goto loop_launch_started;
@@ -175,7 +169,7 @@ loop_launch_started:
 	//TODO: we need accurate acceleration curves, 15 m/s^2 is the initial guess
 	while(true)
 	{
-		if(pow(pow(x_accel, 2) + pow(y_accel, 2) + pow(z_accel,2), 0.5) <= 15) //Take the magnitude of acceleration and wait until it is smaller than 15 m/s^2
+		if(pow(pow(x_accel, 2) + pow(y_accel, 2) + pow(z_accel,2), 0.5) <= 15  || SKIP_SAFETY_CHECKS) //Take the magnitude of acceleration and wait until it is smaller than 15 m/s^2
 		{
 			 logFile.println("Acceleration dropped to normal levels at "+ String(millis(), DEC));
 			 goto loop_high_acceleration;
@@ -208,7 +202,7 @@ loop_high_acceleration:
     averageSecondHalf = averageSecondHalf/(ALTITUDE_BUFFER_SIZE - floor(ALTITUDE_BUFFER_SIZE/2.0));
 
     //Check for descent by checking if the first half of the buffer shows us being higher than the second half
-    if(averageFirstHalf > averageSecondHalf){goto loop_begun_descent;}
+    if(averageFirstHalf > averageSecondHalf || SKIP_SAFETY_CHECKS){goto loop_begun_descent;}
     else{updateData();}
 	}
  
@@ -222,24 +216,26 @@ loop_begun_descent:
 	{
 		 updateData();
 
+     normalised_altitude = altitude - altitude_baseline;
+
      //Sampler logic
-     if (altitude < 9144 && altitude > 6096 && filterNumber != 1) // 10000 ft distance between 30000 ft and 20000 ft
+     if (normalised_altitude < 9144 && normalised_altitude > 6096 && filterNumber != 1) // 10000 ft distance between 30000 ft and 20000 ft
      {
       spinSampler();
      }
-     else if (altitude < 6096 && altitude > 4114.8 && filterNumber != 2) // 6500 ft distance between 20000 ft and 13500 ft
+     else if (normalised_altitude < 6096 && normalised_altitude > 4114.8 && filterNumber != 2) // 6500 ft distance between 20000 ft and 13500 ft
      {
       spinSampler();
      }
-     else if (altitude < 4114.8 && altitude > 3352.8 && filterNumber != 3) // 2500 ft distance between 13500 ft and 11000 ft
+     else if (normalised_altitude < 4114.8 && normalised_altitude > 3352.8 && filterNumber != 3) // 2500 ft distance between 13500 ft and 11000 ft
      {
       spinSampler();
      }
-     else if (altitude < 3352.8 && altitude > 3048 && filterNumber != 4) // 1000 ft distance between 11000 ft and 10000 ft
+     else if (normalised_altitude < 3352.8 && normalised_altitude > 3048 && filterNumber != 4) // 1000 ft distance between 11000 ft and 10000 ft
      {
       spinSampler();
      }
-     else if (altitude < 3048) //If it's lower than 10000ft, no use in collecting data anymore.
+     else if (normalised_altitude < 3048) //If it's lower than 10000ft, no use in collecting data anymore.
      {
       spinSampler(); // Should spin us to filter 5 if everything went well. Otherwise, will spin to unused filter. Check log for details
       goto loop_final_descent;
@@ -257,17 +253,17 @@ loop_final_descent:
 	}
 }
 
-/*
-Function to fetch and update all data sources and listeners
-*/
+/******************************************************************************
+  Fetch and update all data. Record data and communicate when appropriate.
+******************************************************************************/
 void updateData() {
   
-  //Updates barometer variables
-  Serial.println("Trying to get barometric pressure");
-  pressure = baro.readPressure();
+  //Updates baroSensormeter variables
+  Serial.println("Trying to get baroSensormetric pressure");
+  pressure = baroSensor.readPressure();
   Serial.println("Got pressure data");
-  altitude = baro.readAltitude(SEA_LVL_PRESSURE);
-  temperature = baro.readTemperature();
+  altitude = baroSensor.readAltitude(SEA_LVL_PRESSURE);
+  temperature = baroSensor.readTemperature();
   
   //Updates gps variables
   parseGPSStream();
