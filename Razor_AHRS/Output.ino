@@ -4,6 +4,7 @@
 // Only set up for OUTPUT__FORMAT_TEXT so far
 void output_both()
 {
+    Serial.print("$");
     Serial.print(TO_DEG(yaw)); Serial.print("|");
     Serial.print(TO_DEG(pitch)); Serial.print("|");
     Serial.print(TO_DEG(roll)); Serial.print("|");
@@ -18,7 +19,7 @@ void output_both()
 
     Serial.print(gyro[0]); Serial.print("|");
     Serial.print(gyro[1]); Serial.print("|");
-    Serial.print(gyro[2]); Serial.println();
+    Serial.print(gyro[2]); Serial.print("*");
 }
 
 
