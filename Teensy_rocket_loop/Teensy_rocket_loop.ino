@@ -21,6 +21,7 @@
 #define GPS_SERIAL Serial2
 #define IMU_SERIAL Serial1
 
+//#define BMP_180_ADDRESS 0x77
 //Parachute triggers
 #define DROGUE_CHUTE_PIN 20
 
@@ -44,6 +45,9 @@
 //SD card
 #define SD_CS_PIN BUILTIN_SDCARD
 
+//LED
+#define LED_PIN 13
+
 // FLIGHT OPTIONS
 /*****************************************************************/
 #define NUM_FILTERS 6
@@ -59,15 +63,15 @@
 
 // DEBUG OPTIONS
 /*****************************************************************/
-#define SERIAL_DEBUGGING true
+#define SERIAL_DEBUGGING false
 #define SKIP_SAFETY_CHECKS false //************BE VERY CAREFUL TO DISABLE THIS BEFORE WIRING CHARGE************
+#define LED_DEBUGGING true
 
 /*****************************************************************/
 /****************** END OF USER SETUP AREA!  *********************/
 /*****************************************************************/
 
-//Output files
-File dataFile;
+//Output file
 File logFile;
 
 //Peripheral objects
@@ -109,6 +113,8 @@ int filterNumber;
 
 unsigned long lastCommunication;
 
+char dataChar[250];
+
 /*
 Setup method. Initiates all variables and files
 */
@@ -118,6 +124,10 @@ void setup() {
     ; // wait for serial port to connect. Needed for native USB port only
   }
   
+  if (!baroSensor.begin()) { 
+   Serial.println("Could not find a valid BMP085 sensor, check wiring!"); 
+  } 
+
   DOWNLINK_SERIAL.begin(9600);
   GPS_SERIAL.begin(9600);
   IMU_SERIAL.begin(57600);
@@ -128,19 +138,16 @@ void setup() {
   samplerFan.attach(FAN_PIN);
   samplerFan.write(FAN_ARMED_ZERO_THRUST);
 
+  if (LED_DEBUGGING) {pinMode(LED_PIN,OUTPUT);}
 
   if (!SD.begin(SD_CS_PIN)) {
     Serial.println("Initialization failed!");
     return;
   }
   
-  dataFile = SD.open("Data_MASTER.txt", FILE_WRITE);
-  dataFile.println("# Data file initialised at system time " + String(millis(), DEC));
-  dataFile.println("Columns in order w/(units): ");
-  dataFile.flush();
-
   logFile = SD.open("LOGS.txt", FILE_WRITE);
   logFile.println("# Log file initialised at system time " + String(millis(), DEC));
+  logFile.println("Columns in order w/(units): ");
   logFile.flush();
 
   Serial.println("Initialized. Starting main loop.");
@@ -257,19 +264,26 @@ loop_final_descent:
   Fetch and update all data. Record data and communicate when appropriate.
 ******************************************************************************/
 void updateData() {
-  
+
+  if (LED_DEBUGGING) {digitalWrite(LED_PIN, HIGH);}
+  memset(dataChar,'*',sizeof(dataChar));
+ 
   //Updates baroSensormeter variables
-  Serial.println("Trying to get baroSensormetric pressure");
   pressure = baroSensor.readPressure();
-  Serial.println("Got pressure data");
   altitude = baroSensor.readAltitude(SEA_LVL_PRESSURE);
   temperature = baroSensor.readTemperature();
   
+  if (SERIAL_DEBUGGING) {Serial.println("Got barometer data");}
+  
+  
   //Updates gps variables
   parseGPSStream();
-
+  if (SERIAL_DEBUGGING) {Serial.println("Got gps data");}
+  
   //Updates IMU vaiables
   parseIMUStream();
+  if (SERIAL_DEBUGGING) {Serial.println("Got IMU data");}
+  
   
   // Prepares string for logging and telemetry purposes
   String dataString = 
@@ -301,19 +315,27 @@ void updateData() {
     String(altitude_gps) +
     "*";
     
-  while(sizeof(dataString) < 250){
-    dataString=dataString+"*";
-  }
-
-  if (SERIAL_DEBUGGING) {Serial.print(dataString);}
-  dataFile.println(dataString);
-  dataFile.flush();
+  strcpy(dataChar, dataString.c_str());
+  
+  if (SERIAL_DEBUGGING) {Serial.println(dataString);}
+  if (SERIAL_DEBUGGING) {Serial.println(dataChar);}
+  
+  logFile.println(dataChar);
+  logFile.flush();
 
   if (lastCommunication + TIME_BETWEEN_COMMUNICATIONS < millis())
   {
-    DOWNLINK_SERIAL.print(dataString);
+    DOWNLINK_SERIAL.print(dataChar);
     lastCommunication = millis();
   }
+  
+  if (LED_DEBUGGING) 
+  {
+    delay(500);
+    digitalWrite(LED_PIN, LOW);
+    delay(500);
+  }
+  
 }
 
 
@@ -354,13 +376,17 @@ void spinSampler() {
 ******************************************************************************/
 void parseIMUStream() {
   String input;
-  char *temp;
+  char temp[250];
   char *token;
+  bool stringNotRead=true;
   
-  while (IMU_SERIAL.available()){
-    input = IMU_SERIAL.readString();
+  while (stringNotRead && IMU_SERIAL.available()){
+    if(IMU_SERIAL.read() == '$'){
+      input = IMU_SERIAL.readStringUntil('*');
+      stringNotRead=false;
+    }
   }
-
+  
   strcpy(temp, input.c_str());
 
   token = strtok(temp, "|");
