@@ -270,7 +270,7 @@ loop_final_descent:
 void updateData() {
 
   if (LED_DEBUGGING) {digitalWrite(LED_PIN, HIGH);}
-  memset(dataChar,'*',sizeof(dataChar));
+  //memset(dataChar,'*',sizeof(dataChar));
  
   //Updates baroSensormeter variables
   pressure = baroSensor.readPressure();
@@ -318,10 +318,18 @@ void updateData() {
     String(longitude) + "|" +
     String(altitude_gps) +
     "*";
-    
+  char dataChar[strlen(dataString.c_str())+1];
+  Serial.println(strlen(dataString.c_str())+1);
   strcpy(dataChar, dataString.c_str());
-  
-  if (SERIAL_DEBUGGING) {Serial.println(dataString);}
+  if (SERIAL_DEBUGGING) {Serial.println(dataChar);}
+  char FinalString[250];
+  char endingcontrolCs[250-sizeof(dataChar)];
+  memset(endingcontrolCs,'*',(250-sizeof(dataChar)));
+  strcat(FinalString,dataChar);
+  strcat(FinalString,endingcontrolCs);
+  if (SERIAL_DEBUGGING) {Serial.println(endingcontrolCs);}
+  if (SERIAL_DEBUGGING) {Serial.println(dataChar);}
+  if (SERIAL_DEBUGGING) {Serial.println(FinalString);}
   
   
   logFile.println(dataChar);
