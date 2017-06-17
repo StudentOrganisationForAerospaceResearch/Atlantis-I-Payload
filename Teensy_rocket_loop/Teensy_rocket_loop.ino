@@ -17,7 +17,7 @@
 /*****************************************************************/
 //TODO: figure out what these actually are
 //All serial communication lines
-#define DOWNLINK_SERIAL Serial5
+#define DOWNLINK_SERIAL Serial4
 #define GPS_SERIAL Serial2
 #define IMU_SERIAL Serial1
 
@@ -33,14 +33,15 @@
 #define FAN_FULL_THROTTLE 70
 
 //Stepper Motor
+//Stepper Motor
 #define STEPS_PER_REVOLUTION 200
-#define STEPPER_SPEED 100
-#define STEPS_PER_FILTER 25
+#define STEPPER_SPEED 50
+#define STEPS_PER_FILTER 33
 
-#define STEPPER_PIN_IN1A 34
-#define STEPPER_PIN_IN2A 37
-#define STEPPER_PIN_IN1B 38
-#define STEPPER_PIN_IN2B 39
+const int STEPPER_PIN_IN1A = 39;
+const int STEPPER_PIN_IN2A = 38;
+const int STEPPER_PIN_IN1B = 37;
+const int STEPPER_PIN_IN2B = 39;
 
 //SD card
 #define SD_CS_PIN BUILTIN_SDCARD
@@ -318,18 +319,18 @@ void updateData() {
     String(longitude) + "|" +
     String(altitude_gps) +
     "*";
-  char dataChar[strlen(dataString.c_str())+1];
+  //char dataChar[strlen(dataString.c_str())+1];
   Serial.println(strlen(dataString.c_str())+1);
   strcpy(dataChar, dataString.c_str());
   if (SERIAL_DEBUGGING) {Serial.println(dataChar);}
-  char FinalString[250];
-  char endingcontrolCs[250-sizeof(dataChar)];
-  memset(endingcontrolCs,'*',(250-sizeof(dataChar)));
-  strcat(FinalString,dataChar);
-  strcat(FinalString,endingcontrolCs);
-  if (SERIAL_DEBUGGING) {Serial.println(endingcontrolCs);}
+ // char FinalString[250];
+  //char endingcontrolCs[250-sizeof(dataChar)];
+ // memset(endingcontrolCs,'*',(250-sizeof(dataChar)));
+  //strcat(FinalString,dataChar);
+  //strcat(FinalString,endingcontrolCs);
+//  if (SERIAL_DEBUGGING) {Serial.println(endingcontrolCs);}
   if (SERIAL_DEBUGGING) {Serial.println(dataChar);}
-  if (SERIAL_DEBUGGING) {Serial.println(FinalString);}
+//  if (SERIAL_DEBUGGING) {Serial.println(FinalString);}
   
   
   logFile.println(dataChar);
