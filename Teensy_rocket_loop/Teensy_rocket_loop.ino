@@ -116,6 +116,7 @@ int filterNumber;
 
 unsigned long lastCommunication;
 
+String dataString;
 char dataChar[250];
 int num; 
 
@@ -273,9 +274,7 @@ loop_final_descent:
   Fetch and update all data. Record data and communicate when appropriate.
 ******************************************************************************/
 void updateData() {
-
   if (LED_DEBUGGING) {digitalWrite(LED_PIN, HIGH);}
-  
  
   //Updates baroSensormeter variables
   pressure = baroSensor.readPressure();
@@ -295,7 +294,7 @@ void updateData() {
   
   
   // Prepares string for logging and telemetry purposes
-  String dataString = 
+  dataString = 
     "$" + 
     String(millis()) + "|" + 
     
