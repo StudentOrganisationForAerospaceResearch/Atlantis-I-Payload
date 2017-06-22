@@ -218,7 +218,7 @@ loop_high_acceleration:
     averageSecondHalf = averageSecondHalf/(ALTITUDE_BUFFER_SIZE - floor(ALTITUDE_BUFFER_SIZE/2.0));
 
     //Check for descent by checking if the first half of the buffer shows us being higher than the second half
-    if(averageFirstHalf > averageSecondHalf || SKIP_SAFETY_CHECKS){goto loop_begun_descent;}
+    if(averageFirstHalf > (averageSecondHalf + 3) || SKIP_SAFETY_CHECKS){goto loop_begun_descent;}
     else{updateData();}
 	}
  
@@ -235,23 +235,23 @@ loop_begun_descent:
      normalised_altitude = altitude - altitude_baseline;
 
      //Sampler logic
-     if (normalised_altitude < 9144 && normalised_altitude > 6096 && filterNumber != 1) // 10000 ft distance between 30000 ft and 20000 ft
+     if (normalised_altitude < 3048 && normalised_altitude > 2032 && filterNumber != 1) // 3333.33 ft distance between 10000 ft and 6666.66 ft
      {
       spinSampler();
      }
-     else if (normalised_altitude < 6096 && normalised_altitude > 4114.8 && filterNumber != 2) // 6500 ft distance between 20000 ft and 13500 ft
+     else if (normalised_altitude < 2032 && normalised_altitude > 1371.6 && filterNumber != 2) // 2166.66 ft distance between 6666.66 ft and 4500 ft
      {
       spinSampler();
      }
-     else if (normalised_altitude < 4114.8 && normalised_altitude > 3352.8 && filterNumber != 3) // 2500 ft distance between 13500 ft and 11000 ft
+     else if (normalised_altitude < 1371.6 && normalised_altitude > 1117.6 && filterNumber != 3) // 833.33 ft distance between 4500 ft and 3666.66 ft
      {
       spinSampler();
      }
-     else if (normalised_altitude < 3352.8 && normalised_altitude > 3048 && filterNumber != 4) // 1000 ft distance between 11000 ft and 10000 ft
+     else if (normalised_altitude < 1117.6 && normalised_altitude > 1016 && filterNumber != 4) // 333.33 ft distance between 3666.66 ft and 3333.33 ft
      {
       spinSampler();
      }
-     else if (normalised_altitude < 3048) //If it's lower than 10000ft, no use in collecting data anymore.
+     else if (normalised_altitude < 1016) //If it's lower than 10000ft, no use in collecting data anymore.
      {
       spinSampler(); // Should spin us to filter 5 if everything went well. Otherwise, will spin to unused filter. Check log for details
       goto loop_final_descent;
@@ -323,6 +323,7 @@ void updateData() {
     String(longitude) + "|" +
     String(altitude_gps) +
     "*";
+    
   num =strlen(dataString.c_str())+1;
   for(int i =0;i<(249-num);i++){dataString+="*";}  // Should work  
   strcpy(dataChar, dataString.c_str());
@@ -335,7 +336,6 @@ void updateData() {
   {
     DOWNLINK_SERIAL.println(dataChar);
     lastCommunication = millis();
-    //if (SERIAL_DEBUGGING) {Serial.println(LARGE_STRING);}
   }
   
   if (LED_DEBUGGING) 
