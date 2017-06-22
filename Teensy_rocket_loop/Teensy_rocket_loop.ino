@@ -9,6 +9,7 @@
 #include <SD.h>  // Default Arduino Library Supports it
 #include <TinyGPS.h> //TinyGPS library
 
+
 /*****************************************************************/
 /*********** USER SETUP AREA! Set your options here! *************/
 /*****************************************************************/
@@ -17,7 +18,7 @@
 /*****************************************************************/
 //TODO: figure out what these actually are
 //All serial communication lines
-#define DOWNLINK_SERIAL Serial4
+#define DOWNLINK_SERIAL Serial5 //**********This was set to Serial4 for unknown reasons. Ask Cooper if that was correct if this doesn't work.
 #define GPS_SERIAL Serial2
 #define IMU_SERIAL Serial1
 
